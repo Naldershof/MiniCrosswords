@@ -1,9 +1,16 @@
 import numpy as np
 import nltk
 import re
+
+nltk.download('brown')
+nltk.download('wordnet')
+
 from nltk.corpus import wordnet as wn
-import tqdm
+from nltk.corpus import brown
+from nltk.corpus import words
+
 import itertools
+import tqdm
 
 # Right now this just works with 5x5, there's no reason you can't change it though, 
 # it's just not super optimized just yet
