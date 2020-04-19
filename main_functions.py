@@ -3,20 +3,12 @@ import nltk
 import tqdm
 import re
 
+import nltk
 nltk.download('brown')
-nltk.download('wordnet')
-nltk.download('reuters')
-nltk.download('names')
-nltk.download('webtext')
-
-from nltk.corpus import wordnet as wn
 from nltk.corpus import brown
-from nltk.corpus import reuters
-from nltk.corpus import names
-from nltk.corpus import webtext
-
-from nltk.corpus import words
 import itertools
+import gensim.downloader as api
+import time
 
 # Right now this just works with 5x5, there's no reason you can't change it though, 
 # Just need to spend the time to actually make that work
@@ -24,20 +16,20 @@ import itertools
 # Global
 MATCH_DICT = {}
 
-sgridsize = [5,5]
+gridsize = [5,5]
 grid = np.full(gridsize, fill_value='.', dtype=str)
 
-#word_list = list(brown.words())
-#word_list = list(wn.words()) + list(words.words())
-#word_list = list( set( list(reuters.words()) + list(brown.words() + list(names.words()) + list(webtext.words())) ))
-word_list = list( set( list(reuters.words()) + list(brown.words()) ))
-word_list = [x.upper() for x in word_list if x.isalnum()]
+# Instantiate the glove model
+glove_model = api.load("glove-wiki-gigaword-50")
+model_vocab = [x.upper() for x in glove_model.vocab.keys()]
 
-word_limits = gridsize
+brown_words = list(brown.words())
+brown_words = [x.upper() for x in brown_words if x.isalnum()]
+
+word_list = list(set(brown_words) & set(model_vocab))
+
+word_limits = (min(gridsize), max(gridsize))
 word_list = list(filter(lambda x: (len(x) >= word_limits[0]) and (len(x) <= word_limits[0]), word_list))
-
-word_list.extend(starting_words)
-word_list = list(set(word_list))
 
 
 MATCH_DICT = {}
@@ -143,12 +135,15 @@ def add_valid_entries(grid, row=False, column=False, amount=1):
                 
     return valid_grids
 
-def generate_list(length=50):
+def generate_list(length=10, verbose=True, word_list=word_list):
+    if verbose:
+        print('Starting at {}'.format(time.asctime()))
     while True:
         grid = np.full(gridsize, fill_value='.', dtype=str)
         starting_words = [random.choice(word_list), random.choice(word_list)]
-        print(time.asctime())
-        print('{} - {}'.format(starting_words[0], starting_words[1]))
+        if verbose:
+            print(time.asctime())
+            print('{} - {}'.format(starting_words[0], starting_words[1]))
         
         grid[0] = list(starting_words[0])
         # TODO: I forget if this is row or column size, check
@@ -167,9 +162,28 @@ def generate_list(length=50):
             else:
                 pass
         if len(final_grids) > 0:
-            print('Success!')
+            if verbose:
+                print('Success!')
+                print(len(all_grids))
             all_grids.extend(final_grids)
-            print(len(all_grids))
         if len(all_grids) >= length:
             break
+    if verbose:
+        print('Finished at {}'.format(time.asctime()))
     return all_grids
+
+def clues_for_grid(grid, model=glove_model):
+    across = {}
+    down = {}
+    
+    for i in range(0, grid.shape[0]):
+        word = ''.join(test_grid[i,:]).lower()
+        clue = glove_model.most_similar(word)[0][0]
+        across[i] = (clue, word)
+    
+    for i in range(0, grid.shape[1]):
+        word = ''.join(test_grid[:,i]).lower()
+        clue = glove_model.most_similar(word)[0][0]
+        down[i] = (clue, word)
+        
+    return across, down
